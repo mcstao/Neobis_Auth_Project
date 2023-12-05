@@ -43,6 +43,5 @@ class LoginUserSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Невереный логин или пароль.")
         else:
             raise serializers.ValidationError("Неверный логин или пароль.")
-
         return data
 
