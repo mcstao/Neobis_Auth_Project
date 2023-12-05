@@ -18,8 +18,8 @@ class RegisterUserView(views.APIView):
         serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            self.send_confirmation_email(user)
-            return Response({'message': '.'},
+            self.send_confirmation_email(user, request)
+            return Response({'message': 'Завершите регистрацию, подтвердив по почте в течении 5 минут.'},
                             status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
