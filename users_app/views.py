@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from .utils import send_confirmation_email
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
@@ -31,7 +33,9 @@ class ConfirmEmailView(views.APIView):
             decoded_token = RefreshToken(token)
             user_id = decoded_token['user_id']
             user = CustomUser.objects.get(id=user_id)
-            if decoded_token['exp'] < timezone.now():
+            exp_timestamp = decoded_token['exp']
+            exp_datetime = datetime.fromtimestamp(exp_timestamp, timezone.utc)
+            if exp_datetime < timezone.now():
                 return Response({'message': 'Срок действия ссылки подтверждения истек.'},
                                 status=status.HTTP_400_BAD_REQUEST)
             user.is_active = True
@@ -85,9 +89,8 @@ class LogoutView(views.APIView):
     def post(self, request):
         try:
             refresh_token = request.data.get("refresh_token")
-            if refresh_token:
-                token = RefreshToken(refresh_token)
-                token.clear()
-                return Response({"detail": "Вы успешно вышли."}, status=status.HTTP_200_OK)
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"detail": "Вы успешно вышли."}, status=status.HTTP_200_OK)
         except TokenError:
             return Response({'message': 'Ошибка при обработке токена.'}, status=status.HTTP_400_BAD_REQUEST)

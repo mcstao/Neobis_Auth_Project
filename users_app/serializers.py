@@ -27,22 +27,23 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 class LoginUserSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
-    class Meta:
-        model = CustomUser
-        fields = ['id', 'email']
 
     def validate(self, data):
-        username = data.get('username')
-        password = data.get('password')
+        username = data.pop('username', None)
+        password = data.pop('password', None)
 
         if username and password:
             user = authenticate(username=username, password=password)
-            if user:
-                data['user'] = user
+            if user is not None:
+                if user.is_active:
+                    data['user'] = user
+                else:
+                    raise serializers.ValidationError("Учетная запись не активирована.")
             else:
-                raise serializers.ValidationError("Невереный логин или пароль.")
+                raise serializers.ValidationError("Пользователь с таким логином и паролем не найден.")
         else:
-            raise serializers.ValidationError("Неверный логин или пароль.")
+            raise serializers.ValidationError("Необходимо указать логин и пароль.")
+
         return data
 
 
