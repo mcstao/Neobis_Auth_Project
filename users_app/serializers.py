@@ -45,3 +45,6 @@ class LoginUserSerializer(serializers.Serializer):
             raise serializers.ValidationError("Неверный логин или пароль.")
         return data
 
+
+class ResendConfirmationEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()

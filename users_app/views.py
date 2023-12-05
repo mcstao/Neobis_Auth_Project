@@ -1,16 +1,15 @@
-from django.conf import settings
-from django.contrib.sites.shortcuts import get_current_site
-from django.core.mail import send_mail
+from .utils import send_confirmation_email
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import views
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
 
-from .serializers import RegisterUserSerializer, LoginUserSerializer
+from .serializers import RegisterUserSerializer, LoginUserSerializer, ResendConfirmationEmailSerializer
 
 
 class RegisterUserView(views.APIView):
@@ -18,22 +17,12 @@ class RegisterUserView(views.APIView):
         serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            self.send_confirmation_email(user, request)
-            return Response({'message': 'Завершите регистрацию, подтвердив по почте в течении 5 минут.'},
+            self.send_confirmation_email(user)
+            return Response({'message': 'Завершите регистрацию, подтвердив по почте в течение 5 минут.'},
                             status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def send_confirmation_email(self, user, request):
-        expiration_time = timezone.now() + timezone.timedelta(minutes=5)
-        token = RefreshToken.for_user(user)
-        token['exp'] = int(expiration_time.timestamp())
-
-        token = RefreshToken.for_user(user)
-        current_site = get_current_site(request)
-        confirmation_url = f'https://{current_site.domain}/confirm-email/{token}/'
-        subject = 'Подтвердите свою электронную почту'
-        message = f'Пожалуйста, перейдите по следующей ссылке для подтверждения своей электронной почты в течении 5 минут: {confirmation_url}'
-        send_mail(subject, message, settings.EMAIL_HOST_USER, [user.email])
+    send_confirmation_email = send_confirmation_email
 
 
 class ConfirmEmailView(views.APIView):
@@ -43,7 +32,8 @@ class ConfirmEmailView(views.APIView):
             user_id = decoded_token['user_id']
             user = CustomUser.objects.get(id=user_id)
             if decoded_token['exp'] < timezone.now():
-                return Response({'message': 'Срок действия ссылки подтверждения истек.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'message': 'Срок действия ссылки подтверждения истек.'},
+                                status=status.HTTP_400_BAD_REQUEST)
             user.is_active = True
             user.save()
             return Response({'message': 'Подтверждение электронной почты прошло успешно.'}, status=status.HTTP_200_OK)
@@ -53,13 +43,39 @@ class ConfirmEmailView(views.APIView):
             return Response({'message': 'Пользователь не найден.'}, status=status.HTTP_404_NOT_FOUND)
 
 
+class ResendConfirmationEmailView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ResendConfirmationEmailSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                user = CustomUser.objects.get(email=serializer.validated_data['email'])
+            except ObjectDoesNotExist:
+                return Response({'detail': 'Не найдено учетной записи с указанными данными'},
+                                status=status.HTTP_404_NOT_FOUND)
+
+            if user.is_active:
+                return Response({'detail': 'Почта уже подтверждена'}, status=status.HTTP_400_BAD_REQUEST)
+
+            send_confirmation_email(self, user)
+            return Response({'message': 'Повторное письмо с подтверждением отправлено'}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LoginUserView(views.APIView):
     def post(self, request, *args, **kwargs):
         serializer = LoginUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
-            return Response({'user_id': user.id, 'email': user.email}, status=status.HTTP_200_OK)
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
+            return Response({'user_id': user.id, 'access_token': access_token},
+                            status=status.HTTP_200_OK)
+
         return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
 
