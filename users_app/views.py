@@ -11,7 +11,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
 
-from .serializers import RegisterUserSerializer, LoginUserSerializer, ResendConfirmationEmailSerializer
+from .serializers import RegisterUserSerializer, LoginUserSerializer, ResendConfirmationEmailSerializer, LogoutSerializer
 
 
 class RegisterUserView(views.APIView):
@@ -75,9 +75,9 @@ class LoginUserView(views.APIView):
         if serializer.is_valid():
             user = serializer.validated_data['user']
             refresh = RefreshToken.for_user(user)
-            access_token = str(refresh.access_token)
+            access = str(refresh.access_token)
 
-            return Response({'user_id': user.id, 'access_token': access_token},
+            return Response({'user_id': user.id, 'access': access},
                             status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
@@ -87,10 +87,14 @@ class LogoutView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        try:
-            refresh_token = request.data.get("refresh_token")
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response({"detail": "Вы успешно вышли."}, status=status.HTTP_200_OK)
-        except TokenError:
-            return Response({'message': 'Ошибка при обработке токена.'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = LogoutSerializer(data=request.data)
+
+        if serializer.is_valid():
+            try:
+                refresh_token = request.data.get("refresh")
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+                return Response({"detail": "Вы успешно вышли."}, status=status.HTTP_200_OK)
+            except TokenError:
+                return Response({'message': 'Ошибка при обработке токена.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': 'Некоторые данные не были валидными'}, status=status.HTTP_400_BAD_REQUEST)
