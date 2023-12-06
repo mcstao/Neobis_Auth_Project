@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from drf_spectacular.utils import extend_schema
+
 from .utils import send_confirmation_email
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
@@ -11,10 +13,16 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
 
-from .serializers import RegisterUserSerializer, LoginUserSerializer, ResendConfirmationEmailSerializer, LogoutSerializer
+from .serializers import RegisterUserSerializer, LoginUserSerializer, ResendConfirmationEmailSerializer, \
+    LogoutSerializer
 
 
+@extend_schema(
+    description='Этот эндпоинт служит для регистрации пользователя'
+)
 class RegisterUserView(views.APIView):
+    serializer_class = RegisterUserSerializer
+
     def post(self, request, *args, **kwargs):
         serializer = RegisterUserSerializer(data=request.data)
         if serializer.is_valid():
@@ -27,6 +35,10 @@ class RegisterUserView(views.APIView):
     send_confirmation_email = send_confirmation_email
 
 
+@extend_schema(
+    description='Этот эндпоинт служит для подтверждение почты',
+    responses={200: {'description': 'Подтверждение электронной почты прошло успешно'}}
+)
 class ConfirmEmailView(views.APIView):
     def get(self, request, token):
         try:
@@ -47,8 +59,12 @@ class ConfirmEmailView(views.APIView):
             return Response({'message': 'Пользователь не найден.'}, status=status.HTTP_404_NOT_FOUND)
 
 
+@extend_schema(
+    description='Этот эндпоинт служит для повторной отправки письма подтверждения почты'
+)
 class ResendConfirmationEmailView(views.APIView):
     permission_classes = [AllowAny]
+    serializer_class = ResendConfirmationEmailSerializer
 
     def post(self, request, *args, **kwargs):
         serializer = ResendConfirmationEmailSerializer(data=request.data)
@@ -69,7 +85,12 @@ class ResendConfirmationEmailView(views.APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    description='Этот эндпоинт служит для логина пользователя'
+)
 class LoginUserView(views.APIView):
+    serializer_class = LoginUserSerializer
+
     def post(self, request, *args, **kwargs):
         serializer = LoginUserSerializer(data=request.data)
         if serializer.is_valid():
@@ -83,8 +104,12 @@ class LoginUserView(views.APIView):
         return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
 
+@extend_schema(
+    description='Этот эндпоинт служит для выхода пользователя'
+)
 class LogoutView(views.APIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = LogoutSerializer
 
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
