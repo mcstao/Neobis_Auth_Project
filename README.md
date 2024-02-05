@@ -1,4 +1,4 @@
-# Neobis_Cinema
+# Neobis_Auth_Project
 This is DRF project for Auth
 ## Installation
 
@@ -31,7 +31,7 @@ Now you can open:
 http://127.0.0.1:8000/
 ```
 
-## Functions
+## Usage
 
 1. Login and Register.
 2. Email verification user.
